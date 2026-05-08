@@ -1,13 +1,64 @@
-version: "3.8"
 services:
   thirdparty:
     build: ./thirdpartymock
+    container_name: thirdparty
     ports:
       - "3000:3000"
 
+  your_api:
+    build:
+      context: ./your_api
+      target: development
+    container_name: your_api
+    volumes:
+      - ./your_api:/usr/src/app
+      - /usr/src/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=djamo
+      - DATABASE_PASSWORD=djamo
+      - DATABASE_NAME=transactions
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - THIRD_PARTY_API_URL=http://thirdparty:3000
+      - CLIENT_API_URL=http://client:3100
+      - WEBHOOK_URL=http://your_api:3000/transaction/webhook
+    ports:
+      - "3001:3000"
+    depends_on:
+      - postgres
+      - redis
+      - thirdparty
+
   client:
     build: ./client
+    container_name: client
     environment:
-      YOUR_API: "http://thirdparty:3000" # replace with your new API
+      YOUR_API: "http://your_api:3000"
     ports:
       - "3100:3100"
+    depends_on:
+      - your_api
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=djamo
+      - POSTGRES_PASSWORD=djamo
+      - POSTGRES_DB=transactions
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
